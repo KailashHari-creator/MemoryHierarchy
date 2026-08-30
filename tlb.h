@@ -17,25 +17,13 @@ typedef struct {
 
 void tlb_init(TLB *tlb);
 
-/*
- * Return 1 on hit and place FN in *pfn_out.
- * Return 0 on miss.
- *
- * TODO: implement by explicitly comparing valid + PID + VPN
- * against the 32 entries.
- */
+void tlb_dump(const TLB *tlb);
+
 int tlb_lookup(const TLB *tlb,
                uint32_t pid,
                uint32_t vpn,
                uint32_t *pfn_out);
 
-/*
- * TODO:
- * - first handle an already-existing mapping
- * - then use an invalid entry if available
- * - the assignment sheet does NOT state a TLB replacement policy
- *   for the full-TLB case, so do not invent one without course guidance.
- */
 int tlb_insert(TLB *tlb,
                uint32_t pid,
                uint32_t vpn,

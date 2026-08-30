@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "page_table.h"
 
 int page_table_init(PageTable *pt, uint32_t page_count)
@@ -71,4 +72,32 @@ int page_table_unmap(PageTable *pt,
     pt->pte[vpn].present = 0U;
 
     return 1;
+}
+void page_table_dump(
+    const PageTable *pt,
+    uint32_t pid
+)
+{
+    uint32_t vpn;
+
+    printf(
+        "\n========== PAGE TABLE : PID %u ==========\n",
+        pid
+    );
+
+    printf("VPN       Present    PFN\n");
+    printf("-----------------------------------------\n");
+
+    for (vpn = 0U; vpn < pt->page_count; vpn++)
+    {
+        if (pt->pte[vpn].present)
+        {
+            printf(
+                "0x%06X  %u          0x%06X\n",
+                vpn,
+                pt->pte[vpn].present,
+                pt->pte[vpn].pfn
+            );
+        }
+    }
 }

@@ -1,0 +1,369 @@
+============================================================
+          COMPREHENSIVE MEMORY SUBSYSTEM TEST REPORT
+============================================================
+
+Legend:
+  PASS : behaviour matched the expected model
+  FAIL : definite test failure
+  WARN : known/unresolved architectural behaviour detected
+
+This test intentionally stresses translation, paging,
+replacement, cache associativity, writeback and PID state.
+
+
+============================================================
+ TEST 1 - BASIC END-TO-END MEMORY PATH
+============================================================
+
+------------------------------------------------------------
+ Cold access to pre-paged VPN 0
+------------------------------------------------------------
+
+PID 1 VA 0x0000012C
+VPN=0x0 OFFSET=0x12C
+TLB MISS
+PAGE TABLE HIT
+PFN=0x0 PA=0x0000012C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=0
+[PASS] Cold access produced a TLB miss
+[PASS] Pre-paged page produced page-table hit
+[PASS] Cold access missed L1
+[PASS] Cold access missed L2 and reached memory
+
+------------------------------------------------------------
+ Repeat exact address
+------------------------------------------------------------
+
+PID 1 VA 0x0000012C
+VPN=0x0 OFFSET=0x12C
+TLB HIT
+PFN=0x0 PA=0x0000012C
+L1 HIT way=0
+[PASS] Repeated access hit TLB
+[PASS] Repeated access hit L1
+
+------------------------------------------------------------
+ Demand-loaded VPN 2
+------------------------------------------------------------
+
+PID 1 VA 0x0000092C
+VPN=0x2 OFFSET=0x12C
+TLB MISS
+PAGE FAULT
+PFN=0x2 PA=0x0000092C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=1
+[PASS] Previously absent VPN generated a page fault
+[PASS] Page fault installed VPN 2 into page table
+
+Compact system snapshot after basic test:
+
+
+##################################################
+#        MEMORY SUBSYSTEM STATE SNAPSHOT         #
+##################################################
+
+========== TLB SNAPSHOT ==========
+Entry  V  PID   VPN       PFN
+----------------------------------
+    0  1  1     0x000000  0x000000
+    1  1  1     0x000002  0x000002
+
+========== PAGE TABLE : PID 1 ==========
+VPN       Present    PFN
+-----------------------------------------
+0x000000  1          0x000000
+0x000001  1          0x000001
+0x000002  1          0x000002
+Resident pages: 3
+Lower limit   : 2
+Upper limit   : 12
+
+========== PHYSICAL MEMORY ==========
+PFN       PID   VPN       Last Used
+--------------------------------------
+0x000000  1     0x000000  4
+0x000001  1     0x000001  2
+0x000002  1     0x000002  6
+
+Occupied frames: 3 / 32768
+
+========== L1 CACHE ==========
+
+SET 18  predicted-way=1
+Way   V   Virtual Tag
+----------------------
+  0   1   0x00000000
+  1   1   0x00000002
+  2   0   0x00000000
+  3   0   0x00000000
+LRU matrix:
+  0 0 1 1 
+  1 0 1 1 
+  0 0 0 0 
+  0 0 0 0 
+
+========== L2 CACHE ==========
+
+SET 9
+Way   V   D   Tag          LRU
+--------------------------------
+  0   1   0   0x00000000   0
+  1   0   0   0x00000000   0
+  2   0   0   0x00000000   0
+  3   0   0   0x00000000   0
+  4   0   0   0x00000000   0
+  5   0   0   0x00000000   0
+  6   0   0   0x00000000   0
+  7   0   0   0x00000000   0
+
+SET 73
+Way   V   D   Tag          LRU
+--------------------------------
+  0   1   0   0x00000000   0
+  1   0   0   0x00000000   0
+  2   0   0   0x00000000   0
+  3   0   0   0x00000000   0
+  4   0   0   0x00000000   0
+  5   0   0   0x00000000   0
+  6   0   0   0x00000000   0
+  7   0   0   0x00000000   0
+
+##################################################
+#              END OF SNAPSHOT                   #
+##################################################
+
+
+============================================================
+ TEST 2 - L1 WAY PREDICTION AND SQUARE-MATRIX LRU
+============================================================
+
+PID 1 VA 0x0000012C
+VPN=0x0 OFFSET=0x12C
+TLB MISS
+PAGE TABLE HIT
+PFN=0x0 PA=0x0000012C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=0
+
+PID 1 VA 0x0000052C
+VPN=0x1 OFFSET=0x12C
+TLB MISS
+PAGE TABLE HIT
+PFN=0x1 PA=0x0000052C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=1
+
+PID 1 VA 0x0000092C
+VPN=0x2 OFFSET=0x12C
+TLB MISS
+PAGE FAULT
+PFN=0x2 PA=0x0000092C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=2
+
+PID 1 VA 0x00000D2C
+VPN=0x3 OFFSET=0x12C
+TLB MISS
+PAGE FAULT
+PFN=0x3 PA=0x00000D2C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=3
+[PASS] Four colliding blocks filled all four L1 ways
+[PASS] L1 found block after wrong predicted-way probe
+[PASS] The access genuinely exercised a wrong way prediction
+[PASS] Way predictor learned the actual hit way
+[PASS] Square-matrix LRU identifies VPN/tag 0 as oldest
+
+PID 1 VA 0x0000112C
+VPN=0x4 OFFSET=0x12C
+TLB MISS
+PAGE FAULT
+PFN=0x4 PA=0x0000112C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=0
+[PASS] L1 remains exactly four-way after replacement
+[PASS] LRU victim was removed
+[PASS] New fifth block replaced the victim
+
+L1 SET 18
+Predicted way: 0
+
+Way   V   Virtual Tag
+---------------------
+  0   1   0x00000004
+  1   1   0x00000001
+  2   1   0x00000002
+  3   1   0x00000003
+
+LRU square matrix
+  0 1 1 1 
+  0 0 1 1 
+  0 0 0 0 
+  0 0 1 0 
+
+
+============================================================
+ TEST 3 - L2 8-WAY LRU AND DIRTY WRITEBACK
+============================================================
+[PASS] Initial L2 fill required no dirty writeback
+[PASS] Initial L2 fill required no dirty writeback
+[PASS] Initial L2 fill required no dirty writeback
+[PASS] Initial L2 fill required no dirty writeback
+[PASS] Initial L2 fill required no dirty writeback
+[PASS] Initial L2 fill required no dirty writeback
+[PASS] Initial L2 fill required no dirty writeback
+[PASS] Initial L2 fill required no dirty writeback
+[PASS] All eight L2 ways are occupied
+[PASS] Existing L2 tag produced an L2 hit
+[PASS] LRU counter identifies tag 1 as eviction victim
+[PASS] Evicting dirty L2 victim requested writeback
+[PASS] Dirty writeback reconstructed correct block address
+[PASS] Old L2 victim tag is gone
+[PASS] New L2 tag is resident
+[PASS] L2 remains exactly eight-way after eviction
+
+L2 SET 37
+
+Way   V   D   Tag          LRU
+--------------------------------
+  0   1   0   0x00000009   0
+  1   1   0   0x00000002   0
+  2   1   0   0x00000003   0
+  3   1   0   0x00000004   0
+  4   1   0   0x00000005   0
+  5   1   0   0x00000006   0
+  6   1   0   0x00000007   0
+  7   1   0   0x00000008   0
+
+
+============================================================
+ TEST 4 - GLOBAL PAGE LRU, UPPER LIMIT AND INVALIDATION
+============================================================
+
+PID 1 VA 0x0000012C
+VPN=0x0 OFFSET=0x12C
+TLB MISS
+PAGE TABLE HIT
+PFN=0x0 PA=0x0000012C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=0
+
+PID 1 VA 0x0000052C
+VPN=0x1 OFFSET=0x12C
+TLB MISS
+PAGE TABLE HIT
+PFN=0x1 PA=0x0000052C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=1
+
+PID 1 VA 0x0000092C
+VPN=0x2 OFFSET=0x12C
+TLB MISS
+PAGE FAULT
+PFN=0x2 PA=0x0000092C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=2
+[PASS] Process reached but did not exceed upper limit
+[PASS] VPN 0 has TLB entry before replacement
+
+PID 1 VA 0x00000D2C
+VPN=0x3 OFFSET=0x12C
+TLB MISS
+PAGE FAULT
+PFN=0x0 PA=0x0000012C
+L1 MISS
+L2 HIT way=0
+FILLED L1 way=3
+[PASS] Resident-page count stayed at upper limit during replacement
+[PASS] Global LRU evicted oldest VPN 0 PTE
+[PASS] TLB entry for evicted VPN 0 was invalidated
+[PASS] Victim physical frame was reassigned to VPN 3
+[WARN] Fresh page reused a stale L2 line after frame replacement (cache invalidation still needs review)
+[WARN] Old VPN still has a matching L1 line after page eviction (cache invalidation still needs review)
+
+
+============================================================
+ TEST 5 - PID ISOLATION AND PROCESS TERMINATION
+============================================================
+[PASS] Same VPN in two processes maps to different physical frames
+
+------------------------------------------------------------
+ PID 1 accesses VA
+------------------------------------------------------------
+
+PID 1 VA 0x0000012C
+VPN=0x0 OFFSET=0x12C
+TLB MISS
+PAGE TABLE HIT
+PFN=0x0 PA=0x0000012C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=0
+
+------------------------------------------------------------
+ PID 2 accesses exact same VA
+------------------------------------------------------------
+
+PID 2 VA 0x0000012C
+VPN=0x0 OFFSET=0x12C
+TLB MISS
+PAGE TABLE HIT
+PFN=0x2 PA=0x0000092C
+L1 HIT way=0
+[PASS] TLB preserves PID 1 translation
+[PASS] TLB independently preserves PID 2 translation
+[WARN] PID 2 hit PID 1's virtually-tagged L1 entry (PID/context cache policy needs professor confirmation)
+
+------------------------------------------------------------
+ PID-specific TLB invalidation on termination
+------------------------------------------------------------
+[PASS] Terminating PID 1 invalidates PID 1 TLB entries
+[PASS] PID 2 TLB entries survive PID 1 termination
+
+
+============================================================
+ TEST 6 - LOWER RESIDENT-PAGE LIMIT PROTECTION
+============================================================
+
+PID 1 VA 0x0000092C
+VPN=0x2 OFFSET=0x12C
+TLB MISS
+PAGE FAULT
+PFN=0x0 PA=0x0000012C
+L1 MISS
+L2 MISS -> MAIN MEMORY
+FILLED L1 way=0
+[PASS] PID 2 remained exactly at its lower page limit
+[PASS] PID 2 VPN 0 was protected
+[PASS] PID 2 VPN 1 was protected
+[PASS] Requester successfully loaded new page using eligible victim
+[PASS] Self-replacement left PID 1 resident-page count unchanged
+
+
+============================================================
+ FINAL TEST SUMMARY
+============================================================
+PASS : 48
+FAIL : 0
+WARN : 3
+
+CORE TEST RESULT: PASS
+
+Warnings indicate behaviours that should be discussed
+with the professor before final submission.
+
+============================================================
+                    END OF REPORT
+============================================================

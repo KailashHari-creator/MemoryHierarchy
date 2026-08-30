@@ -86,5 +86,8 @@ void memory_system_print_stats(
     const MemorySystem *system
 );
 
+void memory_system_dump(
+    const MemorySystem *system
+);
 
 #endif

@@ -1,5 +1,7 @@
 #include "l1.h"
 
+#include <stdio.h>
+
 void l1_init(L1Cache *cache)
 {
     uint32_t s;
@@ -93,4 +95,83 @@ int l1_fill(L1Cache *cache, uint32_t va, uint32_t pa, uint32_t *way_out)
     *way_out = way;
 
     return 1;
+}
+void l1_dump(
+    const L1Cache *cache
+)
+{
+    uint32_t set;
+    uint32_t way;
+    uint8_t any_valid;
+
+    printf("\n========== L1 CACHE ==========\n");
+
+    for (set = 0U; set < L1_SETS; set++)
+    {
+        any_valid = 0U;
+
+        for (way = 0U; way < L1_WAYS; way++)
+        {
+            if (cache->set[set].line[way].valid)
+            {
+                any_valid = 1U;
+                break;
+            }
+        }
+
+        if (!any_valid)
+            continue;
+
+
+        printf(
+            "\nSET %u  predicted-way=%u\n",
+            set,
+            cache->set[set].predicted_way
+        );
+
+        printf(
+            "Way   V   Virtual Tag\n"
+        );
+
+        printf(
+            "----------------------\n"
+        );
+
+
+        for (way = 0U; way < L1_WAYS; way++)
+        {
+            printf(
+                "%3u   %u   0x%08X\n",
+                way,
+                cache->set[set].line[way].valid,
+                cache->set[set].line[way].virtual_tag
+            );
+        }
+
+
+        printf("LRU matrix:\n");
+
+        for (way = 0U; way < L1_WAYS; way++)
+        {
+            uint32_t bit;
+
+            printf("  ");
+
+            for (bit = 0U; bit < L1_WAYS; bit++)
+            {
+                printf(
+                    "%u ",
+                    (
+                        cache->set[set].lru.row[way]
+                        >>
+                        bit
+                    )
+                    &
+                    1U
+                );
+            }
+
+            printf("\n");
+        }
+    }
 }

@@ -102,3 +102,28 @@ void tlb_invalidate_page(TLB *tlb, uint32_t pid, uint32_t vpn)
     }
 
 }
+#include <stdio.h>
+
+void tlb_dump(const TLB *tlb)
+{
+    uint32_t i;
+
+    printf("\n========== TLB SNAPSHOT ==========\n");
+    printf("Entry  V  PID   VPN       PFN\n");
+    printf("----------------------------------\n");
+
+    for (i = 0U; i < TLB_ENTRIES; i++)
+    {
+        if (tlb->entry[i].valid)
+        {
+            printf(
+                "%5u  %u  %-4u  0x%06X  0x%06X\n",
+                i,
+                tlb->entry[i].valid,
+                tlb->entry[i].pid,
+                tlb->entry[i].vpn,
+                tlb->entry[i].pfn
+            );
+        }
+    }
+}

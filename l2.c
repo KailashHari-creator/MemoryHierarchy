@@ -1,5 +1,7 @@
 #include "l2.h"
 
+#include <stdio.h>
+
 void l2_init(L2Cache *cache)
 {
     uint32_t s;
@@ -99,4 +101,58 @@ void l2_mark_dirty(
 
     cache->set[set].line[way].dirty =
         1U;
+}
+void l2_dump(
+    const L2Cache *cache
+)
+{
+    uint32_t set;
+    uint32_t way;
+    uint8_t any_valid;
+
+    printf("\n========== L2 CACHE ==========\n");
+
+    for (set = 0U; set < L2_SETS; set++)
+    {
+        any_valid = 0U;
+
+        for (way = 0U; way < L2_WAYS; way++)
+        {
+            if (cache->set[set].line[way].valid)
+            {
+                any_valid = 1U;
+                break;
+            }
+        }
+
+        if (!any_valid)
+            continue;
+
+
+        printf(
+            "\nSET %u\n",
+            set
+        );
+
+        printf(
+            "Way   V   D   Tag          LRU\n"
+        );
+
+        printf(
+            "--------------------------------\n"
+        );
+
+
+        for (way = 0U; way < L2_WAYS; way++)
+        {
+            printf(
+                "%3u   %u   %u   0x%08X   %u\n",
+                way,
+                cache->set[set].line[way].valid,
+                cache->set[set].line[way].dirty,
+                cache->set[set].line[way].tag,
+                cache->set[set].lru.counter[way]
+            );
+        }
+    }
 }

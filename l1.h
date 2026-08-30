@@ -24,17 +24,8 @@ typedef struct {
 
 void l1_init(L1Cache *cache);
 
-/*
- * Inputs deliberately include BOTH VA and PA because Q1 specifies:
- *   virtually tagged + physically indexed.
- *
- * TODO:
- * 1. derive set from PA using shifts/masks
- * 2. derive tag from VA using shifts
- * 3. try predicted way
- * 4. compare remaining ways on prediction miss
- * 5. update way predictor and square-matrix LRU on a hit
- */
+void l1_dump(const L1Cache *cache);
+
 int l1_lookup(L1Cache *cache,
               uint32_t va,
               uint32_t pa,

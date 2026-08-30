@@ -10,10 +10,6 @@ typedef struct {
     uint8_t  valid;
     uint8_t  dirty;
 
-    /*
-     * The assignment sheet does not explicitly state L2 virtual/physical
-     * tag semantics. Add the tag field required by your lecture convention.
-     */
     uint32_t tag;
 
     uint8_t data[L2_BLOCK_SIZE];
@@ -30,11 +26,8 @@ typedef struct {
 
 void l2_init(L2Cache *cache);
 
-/*
- * TODO:
- * implement lookup only after fixing the exact L2 tag/address convention
- * from the course material.
- */
+void l2_dump(const L2Cache *cache);
+
 int l2_lookup(L2Cache *cache,
               uint32_t pa,
               uint32_t *way_out);

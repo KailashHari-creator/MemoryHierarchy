@@ -27,4 +27,9 @@ int page_table_map(PageTable *pt,
 int page_table_unmap(PageTable *pt,
                      uint32_t vpn);
 
+void page_table_dump(
+    const PageTable *pt,
+    uint32_t pid
+);
+
 #endif

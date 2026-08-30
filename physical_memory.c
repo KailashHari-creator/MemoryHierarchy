@@ -1,4 +1,5 @@
 #include "physical_memory.h"
+#include <stdio.h>
 
 void physical_memory_init(PhysicalMemory *mem)
 {
@@ -63,4 +64,38 @@ int physical_memory_get_frame(PhysicalMemory *mem,
     (void)vpn;
     (void)pfn_out;
     return 0;
+}
+void physical_memory_dump(
+    const PhysicalMemory *mem
+)
+{
+    uint32_t pfn;
+    uint32_t occupied_count = 0U;
+
+    printf("\n========== PHYSICAL MEMORY ==========\n");
+    printf("PFN       PID   VPN       Last Used\n");
+    printf("--------------------------------------\n");
+
+    for (pfn = 0U; pfn < FRAME_COUNT; pfn++)
+    {
+        if (mem->frame[pfn].occupied)
+        {
+            printf(
+                "0x%06X  %-4u  0x%06X  %llu\n",
+                pfn,
+                mem->frame[pfn].pid,
+                mem->frame[pfn].vpn,
+                (unsigned long long)
+                mem->frame[pfn].last_used
+            );
+
+            occupied_count++;
+        }
+    }
+
+    printf(
+        "\nOccupied frames: %u / %u\n",
+        occupied_count,
+        FRAME_COUNT
+    );
 }

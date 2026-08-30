@@ -3,8 +3,7 @@ CC = gcc
 CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -O0 -g
 
 
-OBJS = \
-	main.o \
+CORE_OBJS = \
 	tlb.o \
 	page_table.o \
 	process.o \
@@ -16,15 +15,19 @@ OBJS = \
 	memory_system.o
 
 
-TEST_OBJS = \
-	test_geometry.o
+all: simulator comprehensive_test
 
 
-all: simulator
+simulator: main.o $(CORE_OBJS)
+	$(CC) $(CFLAGS) -o simulator main.o $(CORE_OBJS)
 
 
-simulator: $(OBJS)
-	$(CC) $(CFLAGS) -o simulator $(OBJS)
+comprehensive_test: comprehensive_test.o $(CORE_OBJS)
+	$(CC) $(CFLAGS) -o comprehensive_test comprehensive_test.o $(CORE_OBJS)
+
+
+comprehensive_test.o: comprehensive_test.c
+	$(CC) $(CFLAGS) -c comprehensive_test.c
 
 
 test_geometry: $(TEST_OBJS)
@@ -80,7 +83,7 @@ memory_system.o: memory_system.c memory_system.h
 
 
 clean:
-	rm -f *.o simulator test_geometry
+	rm -f *.o simulator comprehensive_test memory_test_report.txt
 
 
 .PHONY: all clean test

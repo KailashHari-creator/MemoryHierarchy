@@ -51,5 +51,8 @@ void physical_memory_touch(
     uint32_t pfn
 );
 
+void physical_memory_dump(
+    const PhysicalMemory *mem
+);
 
 #endif

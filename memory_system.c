@@ -796,3 +796,63 @@ void memory_system_print_stats(
 
     printf("========================================\n");
 }
+void memory_system_dump(
+    const MemorySystem *system
+)
+{
+    uint32_t i;
+
+    printf("\n\n");
+    printf("##################################################\n");
+    printf("#        MEMORY SUBSYSTEM STATE SNAPSHOT         #\n");
+    printf("##################################################\n");
+
+
+    tlb_dump(
+        &system->tlb
+    );
+
+
+    for (i = 0U; i < system->process_count; i++)
+    {
+        page_table_dump(
+            &system->processes[i].page_table,
+            system->processes[i].pid
+        );
+
+        printf(
+            "Resident pages: %u\n",
+            system->processes[i].resident_pages
+        );
+
+        printf(
+            "Lower limit   : %u\n",
+            system->processes[i].lower_limit
+        );
+
+        printf(
+            "Upper limit   : %u\n",
+            system->processes[i].upper_limit
+        );
+    }
+
+
+    physical_memory_dump(
+        &system->memory
+    );
+
+
+    l1_dump(
+        &system->l1
+    );
+
+
+    l2_dump(
+        &system->l2
+    );
+
+
+    printf("\n##################################################\n");
+    printf("#              END OF SNAPSHOT                   #\n");
+    printf("##################################################\n");
+}

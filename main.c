@@ -1,190 +1,62 @@
-// #include <stdio.h>
-// #include "config.h"
-// #include "bitops.h"
-// #include "tlb.h"
-// #include "l1.h"
-// #include "l2.h"
-// #include "physical_memory.h"
-
-// // /*
-// //  * This driver is intentionally NOT a completed assignment solution.
-// //  * It exposes the real flow so you can fill each hardware unit yourself.
-// //  */
-
-// // int main(void)
-// // {
-// //     TLB tlb;
-// //     L1Cache l1;
-// //     L2Cache l2;
-// //     PhysicalMemory memory;
-
-// //     uint32_t pid = 1U;
-// //     uint32_t va  = 0x0000012CU;
-
-// //     uint32_t vpn;
-// //     uint32_t page_offset;
-// //     uint32_t pfn = 0U;
-// //     uint32_t pa;
-
-// //     tlb_init(&tlb);
-// //     l1_init(&l1);
-// //     l2_init(&l2);
-// //     physical_memory_init(&memory);
-
-// //     /* CPU -> address wires */
-// //     vpn = vpn_from_va(va);
-// //     page_offset = page_offset_from_va(va);
-
-// //     printf("CPU request\n");
-// //     printf("  PID           = %u\n", pid);
-// //     printf("  VA            = 0x%08X\n", va);
-// //     printf("  VPN           = 0x%X\n", vpn);
-// //     printf("  page offset   = 0x%X\n", page_offset);
-
-// //     /*
-// //      * Next stage should be:
-// //      *
-// //      * if (tlb_lookup(...)) {
-// //      *     ...
-// //      * } else {
-// //      *     inspect process page table
-// //      *     if absent -> page fault / global-LRU frame selection
-// //      *     update PTE
-// //      *     insert TLB entry
-// //      * }
-// //      *
-// //      * This scaffold stops here because that is the assignment logic
-// //      * you need to write and understand yourself.
-// //      */
-
-// //     (void)pfn;
-// //     (void)pa;
-
-// //     return 0;
-// // }
-// #include <stdio.h>
-
-// #include "memory_system.h"
-
-
-// int main(void)
-// {
-//     MemorySystem system;
-
-//     Process processes[1];
-
-
-//     /*
-//      * Temporary example:
-//      *
-//      * PID        = 1
-//      * pages      = 16
-//      * lower      = 2
-//      * upper      = 6
-//      *
-//      * Replace these limits with actual assignment input.
-//      */
-
-//     if (
-//         !process_init(
-//             &processes[0],
-//             1U,
-//             16U,
-//             2U,
-//             6U
-//         )
-//     )
-//     {
-//         printf(
-//             "Process creation failed\n"
-//         );
-
-//         return 1;
-//     }
-
-
-//     memory_system_init(
-//         &system,
-//         processes,
-//         1U
-//     );
-
-
-//     /*
-//      * Common assumption:
-//      * first two pages are pre-paged.
-//      */
-
-//     memory_prepage(
-//         &system,
-//         1U,
-//         0U
-//     );
-
-//     memory_prepage(
-//         &system,
-//         1U,
-//         1U
-//     );
-
-
-//     /*
-//      * Later our actual test trace goes here.
-//      */
-
-
-//     process_destroy(
-//         &processes[0]
-//     );
-
-
-//     return 0;
-// }
 #include <stdio.h>
+#include <stdint.h>
 
 #include "memory_system.h"
 
 
-static void execute_read(
+/* ---------------------------------------------------------
+   Small terminal-friendly wrapper around memory_access().
+   --------------------------------------------------------- */
+
+static void run_access(
     MemorySystem *system,
+    uint32_t step,
+    MemoryOperation operation,
     uint32_t pid,
-    uint32_t va
+    uint32_t va,
+    const char *description
 )
 {
-    printf("\n");
-    printf("========================================\n");
-    printf("READ  PID=%u  VA=0x%08X\n", pid, va);
-    printf("========================================\n");
+    const char *op_name;
 
-    memory_access(
-        system,
+    if (operation == MEM_READ)
+        op_name = "READ";
+    else
+        op_name = "WRITE";
+
+
+    printf("\n");
+    printf("============================================================\n");
+    printf(
+        "[%02u] %-5s  PID=%u  VA=0x%08X\n",
+        step,
+        op_name,
         pid,
-        va,
-        MEM_READ
+        va
     );
+
+    printf("     %s\n", description);
+    printf("------------------------------------------------------------\n");
+
+
+    if (
+        !memory_access(
+            system,
+            pid,
+            va,
+            operation
+        )
+    )
+    {
+        printf("!! ACCESS FAILED !!\n");
+    }
 }
 
 
-static void execute_write(
-    MemorySystem *system,
-    uint32_t pid,
-    uint32_t va
-)
-{
-    printf("\n");
-    printf("========================================\n");
-    printf("WRITE PID=%u  VA=0x%08X\n", pid, va);
-    printf("========================================\n");
 
-    memory_access(
-        system,
-        pid,
-        va,
-        MEM_WRITE
-    );
-}
-
-
+/* =========================================================
+   MAIN
+   ========================================================= */
 
 int main(void)
 {
@@ -193,31 +65,52 @@ int main(void)
     Process processes[1];
 
 
-    /*
-     * Temporary test process.
-     *
-     * 16 virtual pages.
-     *
-     * Lower/upper limits are TEST VALUES only.
-     * Replace with whatever the assignment input
-     * actually supplies.
-     */
+    printf("\n");
+    printf("============================================================\n");
+    printf("              MEMORY HIERARCHY SIMULATOR\n");
+    printf("============================================================\n");
+
+    printf("Configuration:\n");
+    printf("  Page size : 1 KB\n");
+    printf("  TLB       : 32 entries, PID tagged\n");
+    printf("  L1        : 4 KB, 16 B, 4-way\n");
+    printf("  L2        : 32 KB, 32 B, 8-way\n");
+    printf("  Memory    : 32 MB\n");
+    printf("============================================================\n");
+
+
+    /* -----------------------------------------------------
+       Create one test process.
+
+       16 virtual pages.
+
+       lower_limit = 2
+       upper_limit = 12
+
+       These limits are TEMPORARY TEST VALUES.
+       Replace them with the actual assignment/workload
+       values when those are available.
+       ----------------------------------------------------- */
 
     if (
         !process_init(
             &processes[0],
-            1U,
-            16U,
-            2U,
-            12U
+            1U,     /* PID */
+            16U,    /* virtual pages */
+            2U,     /* lower resident-page limit */
+            12U     /* upper resident-page limit */
         )
     )
     {
-        printf("Process initialization failed\n");
+        printf("\nERROR: Process initialization failed.\n");
 
         return 1;
     }
 
+
+    /* -----------------------------------------------------
+       Initialize complete hierarchy.
+       ----------------------------------------------------- */
 
     memory_system_init(
         &system,
@@ -226,178 +119,258 @@ int main(void)
     );
 
 
+    /* -----------------------------------------------------
+       PRE-PAGING
+
+       Common assignment assumption:
+       first two pages are loaded into MAIN MEMORY before
+       execution begins.
+
+       They are NOT inserted into:
+           - TLB
+           - L1
+           - L2
+       ----------------------------------------------------- */
+
+    printf("\n");
+    printf("[BOOT] Pre-paging PID 1: VPN 0 and VPN 1 ... ");
+
+
+    if (
+        !memory_prepage(
+            &system,
+            1U,
+            0U
+        )
+    )
+    {
+        printf("FAILED\n");
+
+        process_destroy(
+            &processes[0]
+        );
+
+        return 1;
+    }
+
+
+    if (
+        !memory_prepage(
+            &system,
+            1U,
+            1U
+        )
+    )
+    {
+        printf("FAILED\n");
+
+        process_destroy(
+            &processes[0]
+        );
+
+        return 1;
+    }
+
+
+    printf("DONE\n");
+
+
+    /* =====================================================
+       TEST TRACE
+       ===================================================== */
+
+
     /*
-     * Common assumption:
+     * 1.
      *
-     * Page 0 and page 1 are pre-paged.
-     *
-     * They enter MAIN MEMORY only.
-     * Not TLB.
-     * Not L1.
-     * Not L2.
-     */
-
-    printf("PRE-PAGING VPN 0\n");
-
-    memory_prepage(
-        &system,
-        1U,
-        0U
-    );
-
-
-    printf("PRE-PAGING VPN 1\n");
-
-    memory_prepage(
-        &system,
-        1U,
-        1U
-    );
-
-
-    /*
-     * ==========================================
-     * TRACE 1
-     *
-     * Page 0 is already resident.
+     * VPN 0 is already in physical memory due to pre-paging.
      *
      * Expected:
-     *
-     * TLB MISS
-     * PAGE TABLE HIT
-     * L1 MISS
-     * L2 MISS
-     * MAIN MEMORY
-     * fill L2
-     * fill L1
-     * ==========================================
+     * TLB miss
+     * Page-table hit
+     * L1 miss
+     * L2 miss
+     * Main-memory access
+     * Cache fill
      */
 
-    execute_read(
+    run_access(
         &system,
         1U,
-        0x0000012CU
+        MEM_READ,
+        1U,
+        0x0000012CU,
+        "Cold read from pre-paged VPN 0"
     );
 
 
     /*
-     * ==========================================
-     * TRACE 2
+     * 2.
      *
      * Exact same address.
      *
      * Expected:
-     *
-     * TLB HIT
-     * L1 HIT
-     * ==========================================
+     * TLB hit
+     * L1 hit
      */
 
-    execute_read(
+    run_access(
         &system,
+        2U,
+        MEM_READ,
         1U,
-        0x0000012CU
+        0x0000012CU,
+        "Repeat previous read -- should exploit TLB and L1"
     );
 
 
     /*
-     * ==========================================
-     * TRACE 3
+     * 3.
      *
-     * Page 1.
+     * Same virtual page, different cache block.
      *
-     * VPN 1 is also already resident
-     * because it was pre-paged.
+     * Translation should hit in TLB,
+     * but this address has not yet been cached.
+     *
+     * Useful for showing:
+     *
+     * TLB hit != cache hit
+     */
+
+    run_access(
+        &system,
+        3U,
+        MEM_READ,
+        1U,
+        0x0000016CU,
+        "Same VPN, different cache block"
+    );
+
+
+    /*
+     * 4.
+     *
+     * VPN 1 was also pre-paged.
      *
      * Expected:
-     *
-     * TLB MISS
-     * PAGE TABLE HIT
-     * cache activity
-     * ==========================================
+     * TLB miss
+     * Page-table hit
+     * Cache activity
      */
 
-    execute_read(
+    run_access(
         &system,
+        4U,
+        MEM_READ,
         1U,
-        0x0000052CU
+        0x0000052CU,
+        "First reference to second pre-paged page"
     );
 
 
     /*
-     * ==========================================
-     * TRACE 4
+     * 5.
      *
-     * Page 2 has NOT been loaded.
+     * VPN 2 was NOT pre-paged.
      *
      * Expected:
-     *
-     * TLB MISS
-     * PAGE FAULT
-     * free physical frame allocated
-     * PTE installed
-     * TLB installed
-     * cache access
-     * ==========================================
+     * TLB miss
+     * Page fault
+     * Free frame allocation
+     * PTE installation
+     * TLB installation
+     * Cache fill
      */
 
-    execute_read(
+    run_access(
         &system,
+        5U,
+        MEM_READ,
         1U,
-        0x0000092CU
+        0x0000092CU,
+        "Demand-paged access -- should produce a page fault"
     );
 
 
     /*
-     * ==========================================
-     * TRACE 5
+     * 6.
      *
-     * Repeat page 2.
+     * Repeat VPN 2 access.
      *
-     * Should now hit translation/cache paths.
-     * ==========================================
+     * Expected:
+     * TLB hit
+     * L1 hit
      */
 
-    execute_read(
+    run_access(
         &system,
+        6U,
+        MEM_READ,
         1U,
-        0x0000092CU
+        0x0000092CU,
+        "Repeat demand-loaded address"
     );
 
 
     /*
-     * ==========================================
-     * TRACE 6
+     * 7.
      *
-     * Write to page 0.
+     * Write to an already cached address.
      *
-     * L1 is write-through.
-     * L2 is write-back.
+     * Q1:
      *
-     * Therefore this eventually marks the
-     * corresponding L2 line DIRTY.
-     * ==========================================
+     * L1 -> write-through
+     * L2 -> write-back
+     *
+     * Therefore the write continues below L1 and
+     * the corresponding L2 line becomes dirty.
      */
 
-    execute_write(
+    run_access(
         &system,
+        7U,
+        MEM_WRITE,
         1U,
-        0x0000012CU
+        0x0000012CU,
+        "Write-through L1; corresponding L2 line becomes dirty"
     );
 
 
-    /*
-     * Print final statistics.
-     */
+    /* =====================================================
+       FINAL MACHINE STATE
+       ===================================================== */
+
+    printf("\n\n");
+    printf("============================================================\n");
+    printf("                    FINAL MACHINE STATE\n");
+    printf("============================================================\n");
+
+
+    memory_system_dump(
+        &system
+    );
+
+
+    /* =====================================================
+       FINAL STATISTICS
+       ===================================================== */
 
     memory_system_print_stats(
         &system
     );
 
 
+    /* -----------------------------------------------------
+       Cleanup.
+       ----------------------------------------------------- */
+
     process_destroy(
         &processes[0]
     );
+
+
+    printf("\n");
+    printf("Simulation completed successfully.\n\n");
 
 
     return 0;
