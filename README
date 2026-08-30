@@ -1,0 +1,481 @@
+DSTN ASSIGNMENT #2 - QUESTION 1
+Memory Hierarchy Simulator
+========================================
+
+Course:
+Data Storage Technologies & Networks (CS F446)
+
+Assignment:
+Assignment #2 - Question #1
+
+Group Number:
+<ENTER GROUP NUMBER>
+
+Group Members:
+1. <NAME 1> - <ID>
+2. <NAME 2> - <ID>
+3. <NAME 3> - <ID>
+
+Contributions:
+1. <NAME 1> - <XX%> - <brief contribution>
+2. <NAME 2> - <XX%> - <brief contribution>
+3. <NAME 3> - <XX%> - <brief contribution>
+
+Significant interactions outside the group:
+<MENTION IF ANY; OTHERWISE WRITE "None">
+
+
+============================================================
+1. PROJECT OVERVIEW
+============================================================
+
+This project implements a C-based simulation of the memory subsystem
+specified in Question #1 of DSTN Assignment #2.
+
+A memory reference follows:
+
+    CPU Virtual Address
+            |
+            v
+           TLB
+            |
+      TLB Hit / Miss
+            |
+            v
+        Page Table
+            |
+      Present / Page Fault
+            |
+            v
+      Physical Frame
+            |
+            v
+     Physical Address
+            |
+            v
+           L1
+            |
+        Hit / Miss
+            |
+            v
+           L2
+            |
+        Hit / Miss
+            |
+            v
+       Main Memory
+
+The implementation uses separate ADTs for each major subsystem.
+Address decomposition uses bitwise masking and shifting rather than
+division/modulo based field extraction.
+
+
+============================================================
+2. QUESTION #1 CONFIGURATION IMPLEMENTED
+============================================================
+
+Paging:
+- Pure paging
+- Page size = 1 KB
+- Frame size = 1 KB
+- First two pages of every process are pre-paged into main memory
+- Remaining pages are demand-loaded
+- Global replacement
+- Main-memory replacement policy: LRU
+- Page tables reside in main memory and are not cached
+
+TLB:
+- 32 entries
+- PID/identifier stored in each entry
+- Lookup using PID + VPN
+- PID-specific invalidation on process termination
+- Individual PID/VPN invalidation when a page is evicted
+
+L1 Cache:
+- 4 KB
+- 16 B block
+- 4-way set associative
+- 64 sets
+- Way prediction
+- Virtually tagged
+- Physically indexed
+- Write-through
+- Look-through
+- LRU square-matrix replacement
+
+L2 Cache:
+- 32 KB
+- 32 B block
+- 8-way set associative
+- 128 sets
+- Write-back
+- Look-aside
+- LRU-counter replacement
+- Dirty-bit handling and writeback on dirty eviction
+
+Main Memory:
+- 32 MB
+- 32768 physical frames
+- Global LRU frame replacement
+- Per-process resident-page lower and upper limits are tracked
+
+
+============================================================
+3. ADDRESS BIT MAPPING
+============================================================
+
+Page size = 1 KB = 2^10 bytes
+
+Virtual address:
+
+    +---------------------------+------------------+
+    |            VPN            |   Page Offset    |
+    +---------------------------+------------------+
+                                   10 bits
+
+Implemented as:
+
+    VPN         = VA >> 10
+    Page Offset = VA & 0x3FF
+
+Physical address:
+
+    PA = (PFN << 10) | PageOffset
+
+L1:
+- 16 B block -> 4 block-offset bits
+- 64 sets -> 6 set bits
+
+    L1 offset      = PA[3:0]
+    L1 set         = PA[9:4]
+    L1 virtual tag = VA[31:10]
+
+L2:
+- 32 B block -> 5 block-offset bits
+- 128 sets -> 7 set bits
+
+    L2 offset = PA[4:0]
+    L2 set    = PA[11:5]
+
+The current implementation uses the remaining upper physical-address
+bits as the L2 tag.
+
+
+============================================================
+4. FILES
+============================================================
+
+config.h
+    Hardware configuration constants.
+
+bitops.h
+    Bitwise address decomposition and address construction.
+
+tlb.h / tlb.c
+    32-entry PID-tagged TLB.
+
+page_table.h / page_table.c
+    Page-table allocation, lookup, mapping and unmapping.
+
+process.h / process.c
+    Process state, page table, resident-page count and page limits.
+
+physical_memory.h / physical_memory.c
+    Physical-frame metadata and global-LRU support.
+
+l1_lru.h / l1_lru.c
+    L1 4x4 square-matrix LRU logic.
+
+l1.h / l1.c
+    L1 lookup, fill, way prediction and replacement.
+
+l2_lru.h / l2_lru.c
+    L2 LRU-counter metadata.
+
+l2.h / l2.c
+    L2 lookup, fill, dirty-bit handling and writeback.
+
+memory_system.h / memory_system.c
+    Connects all subsystem components and executes the complete memory
+    reference path. Also provides statistics and state dumps.
+
+main.c
+    Deterministic demonstration driver.
+
+comprehensive_test.c
+    Comprehensive deterministic test program.
+
+Makefile
+    Builds simulator and comprehensive-test executables.
+
+memory_test_report.txt
+    Formatted output produced by the comprehensive test.
+
+README.txt
+    This file.
+
+
+============================================================
+5. HOW TO COMPILE
+============================================================
+
+Linux + GCC:
+
+    make clean
+    make
+
+Expected executables:
+
+    ./simulator
+    ./comprehensive_test
+
+
+============================================================
+6. HOW TO RUN
+============================================================
+
+Normal demonstration:
+
+    ./simulator
+
+Comprehensive validation:
+
+    ./comprehensive_test
+
+The comprehensive test writes the detailed report to:
+
+    memory_test_report.txt
+
+
+============================================================
+7. PROGRAM STRUCTURE
+============================================================
+
+A normal access executes the following sequence:
+
+1. CPU supplies PID, virtual address and READ/WRITE operation.
+2. VA is split into VPN and page offset using masks/shifts.
+3. TLB is searched using PID + VPN.
+4. On TLB miss, the process page table is consulted.
+5. If the PTE is absent, a page fault is generated.
+6. Physical memory allocates a free frame where possible; otherwise
+   global LRU replacement is used while respecting page limits.
+7. PTE/TLB mappings are updated.
+8. PA is constructed as PFN | page offset.
+9. L1 is accessed with a physical set index and virtual tag.
+10. Way prediction is attempted before the remaining ways are searched.
+11. On L1 miss, L2 is accessed.
+12. On L2 miss, the block is obtained from main memory.
+13. L1 writes use write-through behaviour.
+14. L2 writes use write-back behaviour and dirty bits.
+15. Dirty L2 victims are written back on replacement.
+
+
+============================================================
+8. COMPREHENSIVE TEST COVERAGE
+============================================================
+
+The current test checks:
+
+- Cold TLB miss
+- TLB hit
+- Page-table hit
+- Demand-page fault
+- PTE installation after page fault
+- L1 cold miss
+- L1 hit
+- Wrong way prediction followed by successful L1 hit
+- Way-predictor update
+- Four colliding blocks occupying all four L1 ways
+- Square-matrix LRU victim selection
+- Fifth same-set block causing L1 replacement
+- L2 hit
+- All eight L2 ways occupied
+- L2 LRU victim selection
+- Dirty L2 eviction
+- Dirty writeback address reconstruction
+- Global page replacement
+- Upper resident-page limit enforcement
+- Lower resident-page limit protection
+- TLB invalidation after page eviction
+- Same VA used by two PIDs
+- Independent PID-tagged TLB translations
+- PID-specific TLB invalidation on termination
+
+Most recent comprehensive run:
+
+    PASS : 48
+    FAIL : 0
+    WARN : 3
+    CORE TEST RESULT: PASS
+
+
+============================================================
+9. CURRENT WARNINGS / ITEMS TO VERIFY
+============================================================
+
+1. Cache state after physical-page replacement
+
+   The old PTE and TLB entry are invalidated when a physical frame is
+   reassigned, but old L1/L2 entries associated with that frame may
+   remain valid. Final cache-invalidation behaviour should be confirmed.
+
+2. Virtually-tagged L1 across process contexts
+
+   Two PIDs can use the same VA while mapping it to different PFNs.
+   The TLB distinguishes them correctly, but the current L1 virtual
+   tag does not contain PID/context information. The expected
+   context-switch/cache policy should be confirmed.
+
+3. L2 LRU-counter representation
+
+   The L2 test chooses the expected victim and dirty writeback path.
+   The final counter-state dump should still be manually checked
+   against the exact LRU-counter convention taught in class.
+
+4. Course-specific semantics still to confirm
+
+   - exact meaning of look-through
+   - exact meaning of look-aside
+   - L2 tag/address convention
+   - write-allocate versus no-write-allocate
+   - full-TLB replacement policy
+
+
+============================================================
+10. KNOWN LIMITATIONS
+============================================================
+
+- main.c currently uses deterministic demonstration addresses rather
+  than a final external workload parser.
+
+- Some lower/upper resident-page limits used in tests are test values
+  and must be replaced by actual assignment/workload values if a final
+  input specification provides them.
+
+- The simulator models hierarchy state and control flow, not clock- or
+  signal-level CPU/cache timing.
+
+- Cache data arrays exist structurally, but current validation focuses
+  primarily on address mapping, hit/miss behaviour, residency,
+  replacement and write policy.
+
+- The WARN conditions above are intentionally retained until the exact
+  course interpretation is confirmed.
+
+
+============================================================
+11. STATE-DUMP SUPPORT
+============================================================
+
+The memory-system dump displays:
+
+TLB:
+- entry number
+- valid bit
+- PID
+- VPN
+- PFN
+
+Page table:
+- resident VPNs
+- present bit
+- PFN
+- resident-page count
+- lower and upper page limits
+
+Physical memory:
+- occupied PFNs
+- owner PID
+- owner VPN
+- LRU/last-used metadata
+
+L1:
+- valid sets
+- four ways per set
+- virtual tags
+- predicted way
+- square-matrix LRU state
+
+L2:
+- valid sets
+- eight ways per set
+- valid bit
+- dirty bit
+- tag
+- LRU-counter metadata
+
+Statistics:
+- total accesses
+- reads/writes
+- TLB hits/misses
+- page-table hits
+- page faults
+- L1 hits/misses
+- L2 hits/misses
+- L2 dirty writebacks
+
+
+============================================================
+12. IMPORTANT VIVA POINTS
+============================================================
+
+- TLB comparisons are parallel in real hardware but are emulated using
+  a sequential C scan.
+
+- Address decomposition uses masks and shifts to mirror selection of
+  address-bus fields.
+
+- L1 is virtually tagged and physically indexed, so both VA and PA are
+  involved in an L1 lookup.
+
+- Page replacement and cache replacement are separate:
+      Main memory -> global page-level LRU
+      L1          -> square-matrix LRU
+      L2          -> LRU counter
+
+- The first two pages are pre-paged only into main memory. They are not
+  inserted into the TLB or caches before execution.
+
+- A TLB miss does not necessarily imply a page fault.
+
+- A TLB hit does not necessarily imply a cache hit.
+
+- L1 is write-through, therefore writes continue downward.
+
+- L2 is write-back, therefore modified L2 lines can remain dirty until
+  eviction.
+
+- Global page replacement may choose a page belonging to another
+  process as long as lower/upper resident-page constraints remain
+  satisfied.
+
+
+============================================================
+13. COMPLETION STATUS
+============================================================
+
+Core hierarchy implementation:
+    Completed
+
+Makefile / compilation:
+    Completed
+
+Memory-state snapshot:
+    Completed
+
+Statistics:
+    Completed
+
+Comprehensive deterministic testing:
+    Completed
+
+Current test result:
+    48 PASS / 0 FAIL / 3 WARN
+
+Remaining before final submission:
+    - Confirm warning behaviours with the professor
+    - Confirm course-specific look-through/look-aside semantics
+    - Confirm L2 tag and write-miss conventions
+    - Replace test-only parameters with final assignment values
+    - Fill in group-member names and contribution details above
